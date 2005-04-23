@@ -1,0 +1,10 @@
+index.html
+Build.PL
+LICENSE
+README
+ChangeLog
+MANIFEST
+Makefile.PL
+t/xml.t
+lib/CAM/XML.pm
+META.yml
