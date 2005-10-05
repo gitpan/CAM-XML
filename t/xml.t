@@ -2,13 +2,13 @@
 
 use warnings;
 use strict;
-use Data::Dumper; # for debugging
+use File::Spec;
 
 BEGIN
 { 
    use vars qw($pkg);
-   $pkg = "CAM::XML";
-   use Test::More tests => 74;
+   $pkg = 'CAM::XML';
+   use Test::More tests => 83;
    use_ok($pkg);
 }
 
@@ -121,6 +121,7 @@ is(scalar $root->getNodes(-path => "sub"), 0, "getNodes by path");
 is(scalar $root->getNodes(-path => "/sub"), 0, "getNodes by path");
 is(scalar $root->getNodes(-path => "//sub"), 3, "getNodes by path");
 is(scalar $root->getNodes(-path => "/root/sub"), 3, "getNodes by path");
+is(scalar $root->getNodes(-path => "//"), 5, "getNodes by path");
 
 # Index tests
 is(scalar $root->getNodes(-path => "/root/[1]"), 1, "getNodes by path, index");
@@ -160,8 +161,8 @@ is(scalar $root->getNodes(-path => '/root/sub[@id="0"]'), 0, "getNodes by path, 
 is(scalar $root->getNodes(-path => '/root/sub[@foo=""]'), 0, "getNodes by path, attr");
 
 # Text tests
-is(join('',map{$_->{text}} $root->getNodes(-path => '/text()')), $comparetext1, "getNodes by path, text");
-is(join('',map{$_->{text}} $root->getNodes(-path => '//sub/text()')), $comparetext1sub, "getNodes by path, text");
+is(join('',map{$_->getInnerText()} $root->getNodes(-path => '/text()')), $comparetext1, "getNodes by path, text");
+is(join('',map{$_->getInnerText()} $root->getNodes(-path => '//sub/text()')), $comparetext1sub, "getNodes by path, text");
 
 #<root test="1">
 #<sub id="1">sub 1</sub>
@@ -186,11 +187,6 @@ is($root->getInnerText(), $comparetext1, "getInnerText");
 
 $parsed = $pkg->parse($comparestr1);
 SKIP: {
-   #print Dumper($parsed, $root);
-   #print Dumper($parsed->{children}->[11], $root->{children}->[11]);
-
-   #skip("Fails because we handle cdata differently from XML::Parser", 1);
-
    # Hack to make our test data structure LOOK like XML::Parser output
    splice(@{$root->{children}}, 11, 1, 
           CAM::XML::Text->new("cdata", "This is a complex <![CDATA["),
@@ -213,9 +209,14 @@ is($str, $comparestr2, "Formatted XML");
 $str = $comparestr2;
 $str =~ s/>\s+</></gs; # undo the formatting for the next test
 
-$parsed = $pkg->parse($str);
+$parsed = $pkg->parse(-filename => File::Spec->catfile("t", "sample.xml"));
+is_deeply($parsed->toString(), "<foo>bar</foo>", "Parse file");
+
+$parsed = $pkg->parse(-filename => File::Spec->catfile("t", "nosuchfile.xml"));
+is($parsed, undef, "Parse non-existent file");
+
+$parsed = $root->parse(-string => $str);
 is_deeply($parsed, $root, "Parse test");
-#print Dumper($parsed, $root);
 
 $str = $parsed->toString(-formatted=>1, -level=>1, -indent=>3);
 is($str, $comparestr2, "Deparse parsed XML");
@@ -257,3 +258,13 @@ is($esctest->toString(-formatted => 1, -textformat => 0), "<esc>one &lt; two</es
 $esctest = CAM::XML->new("esc")->add(-text => "two > one");
 is($esctest->toString(), "<esc>two &gt; one</esc>", "gt escaping");
 is($esctest->toString(-formatted => 1, -textformat => 0), "<esc>two &gt; one</esc>\n", "gt escaping");
+
+is(CAM::XML::Text->new()->toString(), q{}, "empty text");
+
+eval { CAM::XML->new(); };
+ok($@, "empty constructor");
+
+is(CAM::XML->new("foo")->getName(), "foo", "getName");
+is_deeply({CAM::XML->new("foo", bar => "baz")->getAttributes()}, {bar => "baz"}, "getAttributes");
+is(CAM::XML->new("foo")->getAttribute(undef), undef, "getAttribute");
+is(CAM::XML->new("foo")->add(CAM::XML->new("bar"))->getChild(0)->getName(), "bar", "getChild");

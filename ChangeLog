@@ -1,3 +1,10 @@
+2005-10-04 23:41  chris
+
+	* Build.PL, MANIFEST, MANIFEST.SKIP, Makefile.PL, lib/CAM/XML.pm,
+	  lib/CAM/XML/Text.pm, lib/CAM/XML/XMLTree.pm, t/pod-coverage.t,
+	  t/pod.t, t/sample.xml, t/xml.t: v1.13 Add more tests.  Clean up
+	  code.  Refactor into three files instead of one.
+
 2005-04-22 22:22  chris
 
 	* Build.PL, LICENSE, README, lib/CAM/XML.pm: v1.12 Relicense
