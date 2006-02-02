@@ -1,6 +1,6 @@
 index.html
 Build.PL
-ChangeLog
+CHANGES
 lib/CAM/XML.pm
 lib/CAM/XML/Text.pm
 lib/CAM/XML/XMLTree.pm

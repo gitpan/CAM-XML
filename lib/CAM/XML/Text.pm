@@ -3,13 +3,15 @@ package CAM::XML::Text;
 use warnings;
 use strict;
 
+our $VERSION = '1.14';
+
 =head1 NAME 
 
 CAM::XML::Text - XML text nodes
 
 =head1 LICENSE
 
-Copyright 2005 Clotho Advanced Media, Inc., <cpan@clotho.com>
+Copyright 2006 Clotho Advanced Media, Inc., <cpan@clotho.com>
 
 This library is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
@@ -22,7 +24,7 @@ This is a helper class to hold text data
 
 =over
 
-=item new type, text
+=item $pkg->new($type, $text)
 
 =cut
 
@@ -42,19 +44,19 @@ sub new
    }, $pkg;
 }
 
-=item toString
+=item $self->toString()
 
 =cut
 
 sub toString
 {
    my $self = shift;
-   return $self->{type} eq 'text'  ? CAM::XML->_XML_escape($self->{text})
-        : $self->{type} eq 'cdata' ? CAM::XML->_CDATA_escape($self->{text})
+   return $self->{type} eq 'text'  ? CAM::XML->_XML_escape($self->{text})    ##no critic for use of private sub
+        : $self->{type} eq 'cdata' ? CAM::XML->_CDATA_escape($self->{text})  ##no critic for use of private sub
         : $self->{text};
 }
 
-=item getInnerText
+=item $self->getInnerText()
 
 =cut
 
@@ -82,3 +84,5 @@ __END__
 Clotho Advanced Media Inc., I<cpan@clotho.com>
 
 Primary Developer: Chris Dolan
+
+=cut

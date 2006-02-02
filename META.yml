@@ -1,10 +1,12 @@
 ---
 name: CAM-XML
-version: 1.13
+version: 1.14
 author:
   - 'Clotho Advanced Media, Inc. <cpan@clotho.com>'
 abstract: Encapsulation of a simple XML data structure
 license: perl
+resources:
+  license: perl://dev.perl.org/licenses/
 requires:
   XML::Parser: 2.27
   perl: 5.006
@@ -13,9 +15,14 @@ build_requires:
 provides:
   CAM::XML:
     file: lib/CAM/XML.pm
-    version: 1.13
+    version: 1.14
   CAM::XML::Text:
     file: lib/CAM/XML/Text.pm
+    version: 1.14
   CAM::XML::XMLTree:
     file: lib/CAM/XML/XMLTree.pm
-generated_by: Module::Build version 0.2611
+    version: 1.14
+generated_by: Module::Build version 0.2706
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.2.html
+  version: 1.2

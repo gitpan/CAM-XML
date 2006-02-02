@@ -7,7 +7,9 @@ use CAM::XML::Text;
 use English qw(-no_match_vars);
 use Carp;
 
-our $VERSION = '1.13';
+our $VERSION = '1.14';
+
+=for stopwords XHTML XPath pre-formatted attr1 attr2
 
 =head1 NAME 
 
@@ -15,7 +17,7 @@ CAM::XML - Encapsulation of a simple XML data structure
 
 =head1 LICENSE
 
-Copyright 2005 Clotho Advanced Media, Inc., <cpan@clotho.com>
+Copyright 2006 Clotho Advanced Media, Inc., <cpan@clotho.com>
 
 This library is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
@@ -32,7 +34,7 @@ under the same terms as Perl itself.
     
     foreach my $c (@{$q->{choices}}) {
       my $choiceTag = CAM::XML->new('choice');
-      $choiceTag->setAttribute('value', $c->{value});
+      $choiceTag->setAttributes('value', $c->{value});
       $choiceTag->add(-text => $c->{text});
       $choicesTag->add($choiceTag);
     }
@@ -63,17 +65,17 @@ implementation of a subset of XPath.  That's not very simple.  Sorry.
 
 =over
 
-=item parse XMLSTRING
+=item $pkg->parse($xmlstring)
 
-=item parse -string => XMLSTRING
+=item $pkg->parse(-string => $xmlstring)
 
-=item parse -filename => XMLFILENAME
+=item $pkg->parse(-filename => $xmlfilename)
 
-=item parse -filehandle => XMLFILEHANDLE
+=item $pkg->parse(-filehandle => $xmlfilehandle)
 
-Parse an incoming stream of XML into a CAM::XML heirarchy.  This
+Parse an incoming stream of XML into a CAM::XML hierarchy.  This
 method just hands the first argument off to XML::Parser, so it can
-accept any style of arg that XML::Parser can.  Note that XML::Parser
+accept any style of argument that XML::Parser can.  Note that XML::Parser
 says the filehandle style should pass an IO::Handle object.  This can
 be called as a class method or an instance method.
 
@@ -99,7 +101,7 @@ sub parse
 {
    my $pkg_or_self = shift;
    my $mode;
-   if ($_[0] && $_[0] =~ /^-/)    # If no mode was specified, imply one
+   if ($_[0] =~ m/\A-/xms)    # If no mode was specified, imply one
    {
       $mode = shift;
    }
@@ -113,12 +115,12 @@ sub parse
    local $SIG{__DIE__};
    local $SIG{__WARN__};
    require CAM::XML::XMLTree;
-   eval { require XML::Parser; };
-   if ($EVAL_ERROR)
+   require XML::Parser;
+   my $pkg = ref $pkg_or_self;
+   if (!$pkg)
    {
-      croak 'Failed to load XML::Parser';
+      $pkg = $pkg_or_self;
    }
-   my $pkg = ref $pkg_or_self || $pkg_or_self;
    my $p = XML::Parser->new(Style => $pkg.'::XMLTree',
                             $flags{-xmlopts} ? %{$flags{xmlopts}} : ());
    my $self;
@@ -127,13 +129,17 @@ sub parse
       if (open my $fh, '<', $xml)
       {
          local $INPUT_RECORD_SEPARATOR = undef;
-         $self = $p->parse(<$fh>);
+         eval {
+            $self = $p->parse(<$fh>);
+         };
          close $fh;
       }
    }
    else
    {
-      $self = $p->parse($xml);
+      eval {
+         $self = $p->parse($xml);
+      };
    }
    if ($self && $flags{-cleanwhitespace})
    {
@@ -142,9 +148,9 @@ sub parse
    return $self;
 }
 
-=item new tagname
+=item $pkg->new($tagname)
 
-=item new tagname, key => value, key => value, ...
+=item $pkg->new($tagname, attr1 => $value1, attr2 => $value2, ...)
 
 Create a new XML tag.  Optionally, you can set tag attributes at the
 same time.
@@ -170,7 +176,9 @@ sub new
    return $self->setAttributes(@_);
 }
 
-=item header
+=item $pkg->header()
+
+=item $self->header()
 
 Return a string containing the following message, suffixed by a newline:
 
@@ -189,7 +197,7 @@ sub header
 
 =over
 
-=item getName
+=item $self->getName()
 
 Returns the name of the node.
 
@@ -201,7 +209,7 @@ sub getName
    return $self->{name};
 }
 
-=item setAttributes key, value, key => value, ...
+=item $self->setAttributes(attr1 => $value1, attr2 => $value2, ...)
 
 Set the value of one or more XML attributes.  If any keys are
 duplicated, only the last one set is recorded.
@@ -216,7 +224,7 @@ sub setAttributes
    {
       my $key   = shift;
       my $value = shift;
-      if (!$key)
+      if (!defined $key || $key eq q{})
       {
          croak 'Invalid key specified';
       }
@@ -225,7 +233,22 @@ sub setAttributes
    return $self;
 }
 
-=item getAttributeNames
+=item $self->deleteAttribute($key)
+
+Remove the specified attribute if it exists.
+
+=cut
+
+sub deleteAttribute
+{
+   my $self = shift;
+   my $key = shift;
+
+   delete $self->{attributes}->{$key};
+   return $self;
+}
+
+=item $self->getAttributeNames()
 
 Returns a list of the names of all the attributes of this node.  The
 names are returned in arbitrary order.
@@ -239,7 +262,7 @@ sub getAttributeNames
    return keys %{ $self->{attributes} };
 }
 
-=item getAttributes
+=item $self->getAttributes()
 
 Returns a hash of all attributes.
 
@@ -252,7 +275,7 @@ sub getAttributes
    return %{ $self->{attributes} };
 }
 
-=item getAttribute KEY
+=item $self->getAttribute($key)
 
 Returns the value of the named attribute, or undef if it does not exist.
 
@@ -266,7 +289,7 @@ sub getAttribute
    return $key ? $self->{attributes}->{$key} : undef;
 }
 
-=item getChildren
+=item $self->getChildren()
 
 Returns an array of XML nodes and text objects contained by this node.
 
@@ -278,7 +301,7 @@ sub getChildren
    return @{ $self->{children} };
 }
 
-=item getChild INDEX
+=item $self->getChild($index)
 
 Returns a child of this node.  The argument is a zero-based index.
 Returns undef if the index is not valid.
@@ -290,11 +313,11 @@ sub getChild
    my $self  = shift;
    my $index = shift;
 
-   return if (!defined $index || $index !~ /^\d+$/);
+   return if (!defined $index || $index !~ m/\A\d+\z/xms);
    return $self->{children}->[$index];
 }
 
-=item getChildNodes
+=item $self->getChildNodes()
 
 Returns an array of XML nodes contained by this node (that is, unlike
 getChildren(), text nodes are ignored).
@@ -308,7 +331,7 @@ sub getChildNodes
    return grep { $_->isa(__PACKAGE__) } @{ $self->{children} };
 }
 
-=item getChildNode INDEX
+=item $self->getChildNode($index)
 
 Returns a CAM::XML child of this node (that is, unlike getChild(),
 text nodes are ignored.  The argument is a zero-based index.  Returns
@@ -321,12 +344,12 @@ sub getChildNode
    my $self  = shift;
    my $index = shift;
 
-   return if (!defined $index || $index !~ /^\d+$/);
+   return if (!defined $index || $index !~ m/\A\d+\z/xms);
    my @kids = grep { $_->isa(__PACKAGE__) } @{ $self->{children} };
    return $kids[$index];
 }
 
-=item setChildren VALUE, VALUE, ...
+=item $self->setChildren($node1, $node2, ...)
 
 Removes all the children from this node and replaces them with the
 supplied values.  All of the values MUST be CAM::XML or CAM::XML::Text
@@ -339,37 +362,40 @@ sub setChildren
 {
    my $self = shift;
 
-   my @bad = grep { !(defined $_ && ref $_ && 
-                   ($_->isa(__PACKAGE__) || $_->isa('CAM::XML::Text'))) } @_;
-   return if (@bad > 0);
+   my @good = grep { defined $_ && ref $_ && 
+                     ($_->isa(__PACKAGE__) || $_->isa('CAM::XML::Text')) } @_;
+   if (@good != @_)
+   {
+      croak 'Attempted to add bogus XML node';
+   }
 
-   @{ $self->{children} } = @_;
+   @{ $self->{children} } = @good;
    return $self;
 }
 
-=item add CAM::XML object
+=item $self->add(CAM::XML instance)
 
-=item add -text => text
+=item $self->add(-text => $text)
 
-=item add -cdata => text
+=item $self->add(-cdata => $text)
 
-=item add -xml => rawxml
+=item $self->add(-xml => $rawxml)
 
-=item add <multiple elements of the above types>
+=item $self->add(<multiple elements of the above types>)
 
 Add content within the current tag.  Order of addition may be
 significant.  This content can be any one of 1) subsidiary XML tags
-(CAM::XML), 2) literal text content (-text or -cdata), or 3)
-pre-formatted XML content (-xml).
+(CAM::XML), 2) literal text content (C<-text> or C<-cdata>), or 3)
+pre-formatted XML content (C<-xml>).
 
-In -text and -cdata content, any reserved characters will be
+In C<-text> and C<-cdata> content, any reserved characters will be
 automatically escaped.  Those two modes differ only in their XML
-representation: -cdata is more human-readable if there are a lot of
-"&", "<" and ">" characters in your text, where -text is usally more
+representation: C<-cdata> is more human-readable if there are a lot of
+"&", "<" and ">" characters in your text, where C<-text> is usually more
 compact for short strings.  These strings are not escaped until
 output.
 
-Content in -xml mode is parsed in as CAM::XML objects.  If it is not
+Content in C<-xml> mode is parsed in as CAM::XML objects.  If it is not
 valid XML, a warning will be emitted and the add will fail.
 
 =cut
@@ -381,64 +407,65 @@ sub add
    while (@_ > 0)
    {
       my $add = shift;
-      if (!$add)
-      {
-         croak 'Undefined object';
-      }
-      elsif (ref $add)
-      {
-         unless ($add->isa(__PACKAGE__) || $add->isa('CAM::XML::Text'))
-         {
-            croak 'Invalid object type to add to a CAM::XML tag (' . ref $add . ')';
-         }
-         push @{ $self->{children} }, $add;
-      }
-      else
-      {
-         if ($add =~ /^-(text|cdata)$/)
-         {
 
-            # If the previous element was the same kind of text item
-            # then merge them.  Otherwise append this text item.
-
-            my $type = $1;
-            my $text = shift;
-            if (@{ $self->{children} } > 0 &&
-                $self->{children}->[-1]->isa('CAM::XML::Text') &&
-                $self->{children}->[-1]->{type} eq $type)
-            {
-               $self->{children}->[-1]->{text} .= $text;
-            }
-            else
-            {
-               push @{ $self->{children} },
-                   CAM::XML::Text->new($type => $text);
-            }
-         }
-         elsif ($add eq '-xml')
-         {
-            my $xml    = shift;
-            my $parsed = $self->parse($xml);
-            if ($parsed)
-            {
-               $self->add($parsed);
-            }
-            else
-            {
-               croak 'Tried to add invalid XML content';
-            }
-         }
-         else
-         {
-            croak "Unknown flag '$add'.  Expected '-text' or '-cdata' or '-xml'";
-         }
-      }
+      # Test different kinds of input
+        !$add                                   ? croak 'Undefined object'
+      : ref $add && $add->isa(__PACKAGE__)      ? push @{ $self->{children} }, $add
+      : ref $add && $add->isa('CAM::XML::Text') ? push @{ $self->{children} }, $add
+      : ref $add                                ? croak 'Invalid object type to add to a CAM::XML node'
+      : $add =~ m/\A-(text|cdata)\z/xms         ? $self->_add_text($1, shift)
+      : $add eq '-xml'                          ? $self->_add_xml(shift)
+      : croak "Unknown flag '$add'.  Expected '-text' or '-cdata' or '-xml'";
    }
 
    return $self;
 }
 
-=item removeWhitespace
+sub _add_text
+{
+   my $self = shift;
+   my $type = shift;
+   my $text = shift;
+
+   if (!defined $text)
+   {
+      $text = q{};
+   }
+   
+   # If the previous element was the same kind of text item
+   # then merge them.  Otherwise append this text item.
+   
+   if (@{ $self->{children} } > 0 &&
+       $self->{children}->[-1]->isa('CAM::XML::Text') &&
+       $self->{children}->[-1]->{type} eq $type)
+   {
+      $self->{children}->[-1]->{text} .= $text;
+   }
+   else
+   {
+      push @{ $self->{children} }, CAM::XML::Text->new($type => $text);
+   }
+   return;
+}
+
+sub _add_xml
+{
+   my $self = shift;
+   my $xml  = shift;
+
+   my $parsed = $self->parse($xml);
+   if ($parsed)
+   {
+      $self->add($parsed);
+   }
+   else
+   {
+      croak 'Tried to add invalid XML content';
+   }
+   return;
+}
+
+=item $self->removeWhitespace()
 
 Clean out all non-significant whitespace.  Whitespace is deemed
 non-significant if it is bracketed by tags.  This might not be true in
@@ -450,7 +477,7 @@ sub removeWhitespace
 {
    my $self = shift;
 
-   my @delete  = ();
+   my @delete_indices  = ();
    my $lasttag = -1;
    foreach my $i (0 .. $#{ $self->{children} })
    {
@@ -459,28 +486,29 @@ sub removeWhitespace
       {
          if (defined $lasttag)
          {
-            push @delete, ($lasttag + 1) .. ($i - 1);
+            push @delete_indices, ($lasttag + 1) .. ($i - 1);
          }
          $child->removeWhitespace();
          $lasttag = $i;
       }
-      elsif (defined $child->{text} && $child->{text} =~ /\S/)
+      elsif ($child->{text} =~ m/\S/xms) # CAM::XML::Text instance
       {
          $lasttag = undef;
       }
    }
    if (defined $lasttag)
    {
-      push @delete, ($lasttag + 1) .. $#{ $self->{children} };
+      push @delete_indices, ($lasttag + 1) .. $#{ $self->{children} };
    }
-   while (@delete > 0)
+   while (@delete_indices > 0)
    {
-      splice @{ $self->{children} }, pop(@delete), 1;
+      my $node_index = pop @delete_indices;
+      splice @{ $self->{children} }, $node_index, 1;
    }
    return $self;
 }
 
-=item getInnerText
+=item $self->getInnerText()
 
 For the given node, descend through all of its children and
 concatenate all the text values that are found.  If none, this method
@@ -497,14 +525,14 @@ sub getInnerText
    while (@stack > 0)
    {
       my $list  = $stack[-1];
-      my $child = shift @$list;
+      my $child = shift @{$list};
       if ($child)
       {
          if ($child->isa(__PACKAGE__))
          {
             push @stack, [@{ $child->{children} }];
          }
-         elsif (defined $child->{text})
+         else # CAM::XML::Text
          {
             $text .= $child->{text};
          }
@@ -517,16 +545,16 @@ sub getInnerText
    return $text;
 }
 
-=item getNodes -tag => TAGNAME
+=item $self->getNodes(-tag => $tagname)
 
-=item getNodes -attr => ATTRNAME, -value => ATTRVALUE
+=item $self->getNodes(-attr => $attrname, -value => $attrvalue)
 
-=item getNodes -path => PATH
+=item $self->getNodes(-path => $path)
 
 Return an array of CAM::XML objects representing nodes that match the
 requested properties.
 
-A path is a syntactic path into the XML doc something like an XPath:
+A path is a syntactic path into the XML doc something like an XPath
 
   '/' divides nodes
   '//' means any number of nodes
@@ -564,7 +592,7 @@ sub getNodes
    while (@stack > 0)
    {
       my $list = $stack[-1];
-      my $obj  = shift @$list;
+      my $obj  = shift @{$list};
       if ($obj)
       {
          if ($obj->isa(__PACKAGE__))
@@ -594,142 +622,158 @@ sub _get_path_nodes
    my $path = shift;
    my $kids = shift || $self->{children};
 
+   my @list = !$path                                   ? $self
+            : $path =~ m,\A /?text\(\)          \z,xms ? $self->_get_path_nodes_text()
+            : $path =~ m,\A /?\[(\d+)\](.*)     \z,xms ? $self->_get_path_nodes_easyindex($kids, $1, $2)
+            : $path =~ m,\A /?\[([^\]]+)\](.*)  \z,xms ? $self->_get_path_nodes_index($kids, $1, $2)
+            : $path =~ m,\A //+                 \z,xms ? $self->_get_path_nodes_all($kids, $path)
+            : $path =~ m,   (/?)(/?)([^/]+)(.*) \z,xms ? $self->_get_path_nodes_match($kids, $path, $1, $2, $3, $4)
+            : croak "path not understood: '$path'";
+
+   return @list;
+}
+
+
+sub _get_path_nodes_text
+{
+   my $self = shift;
+
+   return CAM::XML::Text->new(text => $self->getInnerText());
+}
+
+sub _get_path_nodes_easyindex
+{
+   my $self = shift;
+   my $kids = shift;
+   my $num  = shift;
+   my $rest = shift;
+   
+   # this is a special case of _get_path_nodes_index
+   # it's higher performance since we can go straight to the
+   # index instead of looping
+
+   my $match = $kids->[$num - 1];
+   return $match ? $match->_get_path_nodes($rest) : ();
+}
+
+sub _get_path_nodes_index
+{
+   my $self  = shift;
+   my $kids  = shift;
+   my $limit = shift;
+   my $rest  = shift;
+
+   my $index = 0;
    my @list;
-   if (!$path)
+   foreach my $node (@{$kids})
    {
-      push @list, $self;
-   }
-
-   elsif ($path =~ m,^/?text\(\)$,)
-   {
-      # Note: this is a COPY of the data, not the data itself.  I
-      # *think* that's the right thing to do, but I'm not quite sure.
-
-      push @list, CAM::XML::Text->new(text => $self->getInnerText());
-   }
-
-   elsif ($path =~ m,^/?\[(\d+)\](.*)$,)
-   {
-      # this is a special case of the next elsif
-      # it's higher performance since we can go straight to the
-      # index instead of looping
-      my $num   = $1;
-      my $rest  = $2;
-      my $match = $kids->[$num - 1];
-      if ($match)
+      ++$index;    # one-based
+      if ($self->_match($node, undef, $limit, $index, scalar @{$kids}))
       {
-         push @list, $match->_get_path_nodes($rest);
+         push @list, $node->_get_path_nodes($rest);
       }
    }
+   return @list;
+}
 
-   elsif ($path =~ m,^/?\[([^\]]+)\](.*)$,)
+sub _get_path_nodes_all
+{
+   my $self = shift;
+   my $kids = shift;
+   my $path = shift;
+
+   my @list;
+   foreach my $node (@{$kids})
    {
-      my $limit = $1;
-      my $rest  = $2;
+      if ($node->isa(__PACKAGE__))
+      {
+         push @list, $node, $node->_get_path_nodes($path);
+      }
+   }
+   return @list;
+}
 
+sub _get_path_nodes_match
+{
+   my $self  = shift;
+   my $kids  = shift;
+   my $path = shift;
+   my $base  = shift;
+   my $any   = shift;
+   my $match = shift;
+   my $rest  = shift;
+
+   my @list;
+   my $limit = undef;
+   if ($match =~ s,\[([^\]]+)\]\z,,xms)
+   {
+      $limit = $1;
+      if (!$limit)
+      {
+         croak "bad index in path (indices are one-based): '$path'";
+      }
+   }
+   if ($match && $limit)
+   {
+      # This is a special case that arose from a bug in _match()
+      # TODO: move the @group and $index logic into _match()
+      my @group;
       my $index = 0;
-      foreach my $node (@$kids)
+      my $max   = 0;
+      foreach my $node (@{$kids})
       {
          ++$index;    # one-based
-         if ($self->_match($node, undef, $limit, $index, scalar @$kids))
+         if ($self->_match($node, $match, undef, $index, scalar @{$kids}))
          {
-            push @list, $node->_get_path_nodes($rest);
+            push @group, 1;
+            $max++;
+         }
+         else
+         {
+            push @group, 0;
          }
       }
-   }
-
-   elsif ($path =~ m,^//+$,)
-   {
-      foreach my $node (@$kids)
+      $index = 0;
+      foreach my $i (0 .. $#{$kids})
       {
-         if ($node->isa(__PACKAGE__))
-         {
-            push @list, $node, $node->_get_path_nodes($path);
-         }
-      }
-   }
-
-   elsif ($path =~ m,(/?)(/?)([^/]+)(.*)$,)
-   {
-      my $base  = $1;
-      my $any   = $2;
-      my $match = $3;
-      my $rest  = $4;
-
-      my $limit = undef;
-      if ($match =~ s,\[([^\]]+)\]$,,)
-      {
-         $limit = $1;
-         if (!$limit)
-         {
-            croak "bad index in path (indices are one-based): '$path'";
-         }
-      }
-      if ($match && $limit)
-      {
-         # This is a special case that arose from a bug in _match()
-         # TODO: move the @group and $index logic into _match()
-         my @group;
-         my $index = 0;
-         my $max   = 0;
-         foreach my $node (@$kids)
+         my $node = $kids->[$i];
+         if ($group[$i])
          {
             ++$index;    # one-based
-            if ($self->_match($node, $match, undef, $index, scalar @$kids))
-            {
-               push @group, 1;
-               $max++;
-            }
-            else
-            {
-               push @group, 0;
-            }
-         }
-         $index = 0;
-         foreach my $i (0 .. $#$kids)
-         {
-            my $node = $kids->[$i];
-            if ($group[$i])
-            {
-               ++$index;    # one-based
-               if ($self->_match($node, undef, $limit, $index, $max))
-               {
-                  push @list, $node->_get_path_nodes($rest);
-               }
-            }
-            if ($any)
-            {
-               push @list, $node->_get_path_nodes($path);
-            }
-         }
-      }
-      elsif ($match || $limit)
-      {
-         my $index = 0;
-         foreach my $node (@$kids)
-         {
-            ++$index;    # one-based
-            if ($self->_match($node, $match, $limit, $index, scalar @$kids))
+            if ($self->_match($node, undef, $limit, $index, $max))
             {
                push @list, $node->_get_path_nodes($rest);
             }
-            if ($any)
-            {
-               push @list, $node->_get_path_nodes($path);
-            }
+         }
+         if ($any)
+         {
+            push @list, $node->_get_path_nodes($path);
          }
       }
-      else
+   }
+   elsif ($match || $limit)
+   {
+      my $index = 0;
+      foreach my $node (@{$kids})
       {
-         die 'Internal error: neither match nor limit were true';
+         ++$index;    # one-based
+         if ($self->_match($node, $match, $limit, $index, scalar @{$kids}))
+         {
+            push @list, $node->_get_path_nodes($rest);
+         }
+         if ($any)
+         {
+            push @list, $node->_get_path_nodes($path);
+         }
       }
    }
    else
    {
-      croak "path not understood: '$path'";
+      die 'Internal error: neither match nor limit were true';
    }
    return @list;
 }
+
 sub _match
 {
    my $self  = shift;
@@ -760,16 +804,16 @@ sub _match
          $limit = -1;
       }
 
-      if ($limit =~ /^\-\d+/)
+      if ($limit =~ m/\A\-\d+/xms)
       {
          return if ($max + $limit + 1 != $index);
       }
-      elsif ($limit =~ /^\d+/)
+      elsif ($limit =~ m/\A\d+/xms)
       {
          return if ($limit != $index);
       }
-      elsif ($limit =~ /^\@(\w+)=\"([^\"]*)\"$/ ||
-             $limit =~ /^\@(\w+)=\'([^\']*)\'$/)
+      elsif ($limit =~ m/\A\@(\w+)=\"([^\"]*)\"\z/xms ||
+             $limit =~ m/\A\@(\w+)=\'([^\']*)\'\z/xms)
       {
          return if (!$is_element);
          my $attr = $1;
@@ -785,7 +829,7 @@ sub _match
    return $self;
 }
 
-=item toString [OPTIONS...]
+=item $self->toString([OPTIONS])
 
 Serializes the tag and all subsidiary tags into an XML string.  This
 is called recursively on any subsidiary CAM::XML objects.  Note that
@@ -818,12 +862,13 @@ Example: -formatted => 1
      </bar>
    </foo>
 
-Example: -formatted => 1, textformat => 0
+Example: C<-formatted =E<gt> 1, textformat =E<gt> 0>
 
    <foo>
      <bar>Baz</bar>
    </foo>
-Example: -formatted => 1, textformat => 0, -indent => 4
+
+Example: C<-formatted =E<gt> 1, textformat =E<gt> 0, -indent =E<gt> 4>
 
    <foo>
        <bar>Baz</bar>
@@ -844,7 +889,7 @@ sub toString
          $args{'-textformat'} = 1;
       }
    }
-   if (!$args{'-indent'} || $args{'-indent'} =~ /\D/)
+   if (!defined $args{'-indent'} || $args{'-indent'} =~ m/\D/xms)
    {
       $args{'-indent'} = 2;
    }
@@ -922,10 +967,10 @@ sub _XML_escape
    {
       $text = q{};
    }
-   $text =~ s/&/&amp;/g;
-   $text =~ s/</&lt;/g;
-   $text =~ s/>/&gt;/g;
-   $text =~ s/\"/&quot;/g;
+   $text =~ s/&/&amp;/gxms;
+   $text =~ s/</&lt;/gxms;
+   $text =~ s/>/&gt;/gxms;
+   $text =~ s/\"/&quot;/gxms;
    return $text;
 }
 
@@ -936,7 +981,7 @@ sub _CDATA_escape
    my $text        = shift;
 
    # Escape illegal "]]>" strings by ending and restarting the CDATA section
-   $text =~ s/\]\]>/]]>]]&gt;<![CDATA[/g;
+   $text =~ s/ ]]> /]]>]]&gt;<![CDATA[/gxms;
 
    return "<![CDATA[$text]]>";
 }
@@ -954,17 +999,19 @@ that are added to the data structure.
 
 =head1 CODING
 
-This module has just over 90% code coverage in its regression tests,
-as reported by L<Devel::Cover> via C<perl Build testcover>.  The
-remaining 10% is mostly error conditions and a few conditional
-defaults.
+This module has just over 97% code coverage in its regression tests,
+as reported by Devel::Cover via C<perl Build testcover>.  The
+remaining few percent is mostly error conditions and a few conditional
+defaults on internal methods.
 
-This module passes many of the Perl Best Practices guidelines, as
-enforced by L<Perl::Critic> v0.09.  Notable exceptions are the
-legacy camelCase subroutine names.
+This module passes most of the Perl Best Practices guidelines, as
+enforced by Perl::Critic v0.14.  A notable exceptions is the
+legacy use of C<camelCase> subroutine names.
 
 =head1 AUTHOR
 
 Clotho Advanced Media Inc., I<cpan@clotho.com>
 
 Primary Developer: Chris Dolan
+
+=cut
